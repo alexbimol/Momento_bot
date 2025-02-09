@@ -2,16 +2,28 @@ import logging
 import asyncio
 import os
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 from dotenv import load_dotenv
 
-# Загружаем токен из .env
+# Загружаем токен
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
+# Проверяем, загружен ли токен
+if not TOKEN:
+    raise ValueError("Ошибка: Токен не загружен! Проверь .env или переменные окружения.")
+
 bot = Bot(token=TOKEN)
-dp = Dispatcher(bot=bot)  # Pass bot explicitly to Dispatcher
+dp = Dispatcher()
+
+# Состояния для заказа
+class OrderState(StatesGroup):
+    name = State()
+    address = State()
+    order = State()
 
 # Главное меню
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
@@ -22,10 +34,17 @@ main_menu = InlineKeyboardMarkup(inline_keyboard=[
 
 # Меню заказа
 order_menu = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="☕️ Кофе", callback_data="order_coffee"),
+    [InlineKeyboardButton(text="☕ Кофе", callback_data="order_coffee"),
      InlineKeyboardButton(text="🍹 Коктейли", callback_data="order_cocktails")],
     [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
 ])
+
+# Кнопки для ввода данных клиента
+request_contact = ReplyKeyboardMarkup(
+    keyboard=[[KeyboardButton(text="📍 Отправить адрес", request_location=True)]],
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
 
 # Команда /start
 @dp.message(Command("start"))
@@ -38,19 +57,39 @@ async def send_welcome(message: types.Message):
 
 # Обработчик кнопки "🛍 Заказать"
 @dp.callback_query(lambda c: c.data == "order")
-async def order_handler(callback: types.CallbackQuery):
-    await callback.message.edit_text(
-        "Что вы хотите заказать?",
-        reply_markup=order_menu
-    )
+async def order_handler(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.answer("Введите ваше имя:")
+    await state.set_state(OrderState.name)
 
-# Обработчик выбора напитков
-@dp.callback_query(lambda c: c.data in ["order_coffee", "order_cocktails"])
-async def choose_drink(callback: types.CallbackQuery):
-    drink_type = "кофе" if callback.data == "order_coffee" else "коктейли"
-    await callback.message.answer(
-        f"Вы выбрали {drink_type}. Оформить заказ можно по телефону: +30 251 039 1646"
-    )
+# Получение имени клиента
+@dp.message(OrderState.name)
+async def get_name(message: types.Message, state: FSMContext):
+    await state.update_data(name=message.text)
+    await message.answer("Введите ваш адрес доставки:", reply_markup=request_contact)
+    await state.set_state(OrderState.address)
+
+# Получение адреса клиента
+@dp.message(OrderState.address)
+async def get_address(message: types.Message, state: FSMContext):
+    address = message.text if message.text else f"📍 Локация: {message.location.latitude}, {message.location.longitude}"
+    await state.update_data(address=address)
+    await message.answer("Введите, что вы хотите заказать:")
+    await state.set_state(OrderState.order)
+
+# Получение заказа клиента
+@dp.message(OrderState.order)
+async def get_order(message: types.Message, state: FSMContext):
+    await state.update_data(order=message.text)
+    data = await state.get_data()
+
+    order_info = (f"📝 **Новый заказ:**\n\n"
+                  f"👤 Имя: {data['name']}\n"
+                  f"📍 Адрес: {data['address']}\n"
+                  f"🍽 Заказ: {data['order']}\n\n"
+                  f"📞 Свяжитесь с клиентом для подтверждения!")
+
+    await message.answer(order_info, parse_mode="Markdown", reply_markup=main_menu)
+    await state.clear()
 
 # Обработчик кнопки "📜 Меню"
 @dp.callback_query(lambda c: c.data == "menu")
@@ -58,7 +97,7 @@ async def show_menu(callback: types.CallbackQuery):
     await callback.message.edit_text(
         "Выберите категорию меню:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="☕️ Χυμοί & Ροφήματα", callback_data="menu_juices")],
+            [InlineKeyboardButton(text="☕ Χυμοί & Ροφήματα", callback_data="menu_juices")],
             [InlineKeyboardButton(text="🍫 Σοκολάτες", callback_data="menu_chocolates")],
             [InlineKeyboardButton(text="🍺 Μπύρες & Ποτά", callback_data="menu_drinks")],
             [InlineKeyboardButton(text="🍕 Φαγητό", callback_data="menu_food")],
@@ -66,7 +105,7 @@ async def show_menu(callback: types.CallbackQuery):
         ])
     )
 
-# Меню по категориям
+# Меню с ценами
 menu_text = {
     "menu_juices": "**Χυμοί & Ροφήματα**\n"
                    "• Milkshake (Βανίλια / Σοκολάτα / Φράουλα) – 4.00€\n"
@@ -95,7 +134,8 @@ menu_text = {
                    "• Vodka / Gin / Ουίσκι – 6.00€\n"
                    "• Μαύρα ρούμια – 7.00€\n"
                    "• Special (Chivas, Dimple, Jack Daniels, Black Label, Cardhu) – 8.00€",
-                "menu_food": "**Φαγητό**\n"
+
+    "menu_food": "**Φαγητό**\n"
                  "• Πίτσα – 5.00€\n"
                  "• Club Sandwich – 5.00€\n"
                  "• Τοστ – 2.50€\n"
@@ -106,29 +146,9 @@ menu_text = {
 # Обработчик выбора категории меню
 @dp.callback_query(lambda c: c.data in menu_text.keys())
 async def send_menu_category(callback: types.CallbackQuery):
-    category = callback.data
     await callback.message.edit_text(
-        menu_text[category],
+        menu_text[callback.data],
         parse_mode="Markdown"
-    )
-
-# Обработчик кнопки "📞 Связаться"
-@dp.callback_query(lambda c: c.data == "contact")
-async def contact_handler(callback: types.CallbackQuery):
-    contact_info = (
-        "📞 Свяжитесь с нами:\n"
-        "📍 Адрес: Kavala, Greece\n"
-        "📱 Телефон: +30 251 039 1646\n"
-        "💬 Telegram: @momento_support"
-    )
-    await callback.message.answer(contact_info)
-
-# Кнопка "Назад"
-@dp.callback_query(lambda c: c.data == "back_to_main")
-async def back_to_main(callback: types.CallbackQuery):
-    await callback.message.edit_text(
-        "Вы можете легко оформить заказ, посмотреть меню или связаться с нами.",
-        reply_markup=main_menu
     )
 
 # Запуск бота
@@ -136,5 +156,5 @@ async def main():
     logging.basicConfig(level=logging.INFO)
     await dp.start_polling(bot)
 
-if name == "main":
+if __name__ == "__main__":
     asyncio.run(main())
