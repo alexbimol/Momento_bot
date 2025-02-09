@@ -16,7 +16,7 @@ TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
     raise ValueError("Ошибка: Токен не загружен! Проверь .env или переменные окружения.")
 
-bot = Bot(token=TOKEN)
+bot = Bot(token="7776292962:AAHQiJNdilk6D6_nNP07E-PfN8gDmm8rD8I")
 dp = Dispatcher()
 
 # Состояния для заказа
