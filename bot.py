@@ -20,21 +20,33 @@ class OrderState(StatesGroup):
     name = State()
     phone = State()
     address = State()
-    order = State()
+    confirm = State()
+
+# ---- Меню с продуктами ----
+products = {
+    "coffee": {"name": "☕ Кофе", "price": 3.50, "count": 0},
+    "cocktail": {"name": "🍹 Коктейль", "price": 5.00, "count": 0},
+    "pizza": {"name": "🍕 Пицца", "price": 7.00, "count": 0}
+}
+
+def generate_product_menu():
+    """Создаёт кнопки с продуктами и кнопками + / -"""
+    buttons = []
+    for key, product in products.items():
+        buttons.append([
+            InlineKeyboardButton(text=f"➖", callback_data=f"decrease_{key}"),
+            InlineKeyboardButton(text=f"{product['name']} ({product['count']})", callback_data=f"none"),
+            InlineKeyboardButton(text=f"➕", callback_data=f"increase_{key}")
+        ])
+    buttons.append([InlineKeyboardButton(text="✅ Оформить заказ", callback_data="confirm_order")])
+    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 # ---- Главное меню ----
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="🛍 Заказать", callback_data="order"),
      InlineKeyboardButton(text="📜 Меню", callback_data="menu")],
     [InlineKeyboardButton(text="📞 Связаться", callback_data="contact")]
-])
-
-# ---- Кнопки для заказа ----
-order_menu = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="☕ Кофе", callback_data="order_coffee"),
-     InlineKeyboardButton(text="🍹 Коктейли", callback_data="order_cocktails")],
-    [InlineKeyboardButton(text="🍕 Еда", callback_data="order_food")],
-    [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
 ])
 
 # ---- Кнопки для отправки контакта и адреса ----
@@ -49,26 +61,6 @@ address_request = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=True
 )
-
-# ---- Меню с продуктами и выбором количества ----
-products = {
-    "coffee": {"name": "☕ Кофе", "price": 3.50, "count": 0},
-    "cocktail": {"name": "🍹 Коктейль", "price": 5.00, "count": 0},
-    "pizza": {"name": "🍕 Пицца", "price": 7.00, "count": 0}
-}
-
-def generate_product_menu():
-    """Создаёт кнопки с продуктами и кнопками + / -"""
-    buttons = []
-    for key, product in products.items():
-        buttons.append([
-            InlineKeyboardButton(text=f"➖", callback_data=f"decrease_{key}"),
-            InlineKeyboardButton(text=f"{product['name']} ({product['count']})", callback_data="none"),
-            InlineKeyboardButton(text=f"➕", callback_data=f"increase_{key}")
-        ])
-    buttons.append([InlineKeyboardButton(text="✅ Оформить заказ", callback_data="confirm_order")])
-    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 # ---- Команда /start ----
 @dp.message(Command("start"))
@@ -89,9 +81,9 @@ async def order_handler(callback: types.CallbackQuery):
 async def modify_product_count(callback: types.CallbackQuery):
     action, product_key = callback.data.split("_")
     if product_key in products:
-        if action == "increase_":
+        if action == "increase":
             products[product_key]["count"] += 1
-        elif action == "decrease_" and products[product_key]["count"] > 0:
+        elif action == "decrease" and products[product_key]["count"] > 0:
             products[product_key]["count"] -= 1
 
     await callback.message.edit_reply_markup(reply_markup=generate_product_menu())
@@ -99,16 +91,15 @@ async def modify_product_count(callback: types.CallbackQuery):
 # ---- Подтверждение заказа ----
 @dp.callback_query(lambda c: c.data == "confirm_order")
 async def confirm_order(callback: types.CallbackQuery, state: FSMContext):
-    order_text = "🛒 **Ваш заказ:**\n\n"
-    total_price = 0
-    for product in products.values():
-        if product["count"] > 0:
-            order_text += f"• {product['name']} x {product['count']} = {product['count'] * product['price']}€\n"
-            total_price += product["count"] * product["price"]
-
+    total_price = sum(p["count"] * p["price"] for p in products.values())
     if total_price == 0:
         await callback.answer("Выберите хотя бы один продукт!", show_alert=True)
         return
+
+    order_text = "🛒 **Ваш заказ:**\n\n"
+    for product in products.values():
+        if product["count"] > 0:
+            order_text += f"• {product['name']} x {product['count']} = {product['count'] * product['price']}€\n"
 
     order_text += f"\n💰 **Итого:** {total_price}€\n\nВведите ваше имя:"
     await callback.message.answer(order_text, parse_mode="Markdown")
