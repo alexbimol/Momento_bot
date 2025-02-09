@@ -11,7 +11,7 @@ load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
 bot = Bot(token=TOKEN)
-dp = Dispatcher()
+dp = Dispatcher(bot=bot)  # Pass bot explicitly to Dispatcher
 
 # Главное меню
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
@@ -22,7 +22,7 @@ main_menu = InlineKeyboardMarkup(inline_keyboard=[
 
 # Меню заказа
 order_menu = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="☕ Кофе", callback_data="order_coffee"),
+    [InlineKeyboardButton(text="☕️ Кофе", callback_data="order_coffee"),
      InlineKeyboardButton(text="🍹 Коктейли", callback_data="order_cocktails")],
     [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
 ])
@@ -31,7 +31,7 @@ order_menu = InlineKeyboardMarkup(inline_keyboard=[
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message):
     await message.answer(
-        "Добро пожаловать в Momento Cafe Bar! ☕🍹\n\n"
+        "Добро пожаловать в Momento Cafe Bar! ☕️🍹\n\n"
         "Вы можете легко оформить заказ, посмотреть меню или связаться с нами.",
         reply_markup=main_menu
     )
@@ -58,7 +58,7 @@ async def show_menu(callback: types.CallbackQuery):
     await callback.message.edit_text(
         "Выберите категорию меню:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="☕ Χυμοί & Ροφήματα", callback_data="menu_juices")],
+            [InlineKeyboardButton(text="☕️ Χυμοί & Ροφήματα", callback_data="menu_juices")],
             [InlineKeyboardButton(text="🍫 Σοκολάτες", callback_data="menu_chocolates")],
             [InlineKeyboardButton(text="🍺 Μπύρες & Ποτά", callback_data="menu_drinks")],
             [InlineKeyboardButton(text="🍕 Φαγητό", callback_data="menu_food")],
@@ -95,8 +95,7 @@ menu_text = {
                    "• Vodka / Gin / Ουίσκι – 6.00€\n"
                    "• Μαύρα ρούμια – 7.00€\n"
                    "• Special (Chivas, Dimple, Jack Daniels, Black Label, Cardhu) – 8.00€",
-
-    "menu_food": "**Φαγητό**\n"
+                "menu_food": "**Φαγητό**\n"
                  "• Πίτσα – 5.00€\n"
                  "• Club Sandwich – 5.00€\n"
                  "• Τοστ – 2.50€\n"
@@ -137,5 +136,5 @@ async def main():
     logging.basicConfig(level=logging.INFO)
     await dp.start_polling(bot)
 
-if __name__ == "__main__":
+if name == "main":
     asyncio.run(main())
