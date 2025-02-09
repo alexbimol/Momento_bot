@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
-bot = Bot(token="7776292962:AAHQiJNdilk6D6_nNP07E-PfN8gDmm8rD8I")
+bot = Bot(token="7776292962:AAHM5hxD-jHPHrAxdI5SumSD4EQpWOlmIC8")
 dp = Dispatcher()
 
 # ---- Состояния для оформления заказа ----
