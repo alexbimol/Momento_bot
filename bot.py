@@ -13,7 +13,7 @@ load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
 bot = Bot(token="7776292962:AAHM5hxD-jHPHrAxdI5SumSD4EQpWOlmIC8")
-dp = Dispatcher()
+dp = Dispatcher(bot)  # Указываем bot явно для избежания багов
 
 # ---- Состояния для оформления заказа ----
 class OrderState(StatesGroup):
@@ -34,11 +34,12 @@ def generate_product_menu():
     buttons = []
     for key, product in products.items():
         buttons.append([
-            InlineKeyboardButton(text=f"➖", callback_data=f"decrease_{key}"),
-            InlineKeyboardButton(text=f"{product['name']} ({product['count']})", callback_data=f"none"),
-            InlineKeyboardButton(text=f"➕", callback_data=f"increase_{key}")
+            InlineKeyboardButton(text="➖", callback_data=f"decrease_{key}"),
+            InlineKeyboardButton(text=f"{product['name']} ({product['count']})", callback_data="none"),
+            InlineKeyboardButton(text="➕", callback_data=f"increase_{key}")
         ])
     buttons.append([InlineKeyboardButton(text="✅ Оформить заказ", callback_data="confirm_order")])
+    buttons.append([InlineKeyboardButton(text="🗑 Очистить корзину", callback_data="clear_cart")])
     buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -74,6 +75,7 @@ async def send_welcome(message: types.Message):
 # ---- Обработчик кнопки "🛍 Заказать" ----
 @dp.callback_query(lambda c: c.data == "order")
 async def order_handler(callback: types.CallbackQuery):
+    await callback.answer()
     await callback.message.edit_text("Выберите продукты:", reply_markup=generate_product_menu())
 
 # ---- Увеличение и уменьшение количества ----
@@ -86,6 +88,15 @@ async def modify_product_count(callback: types.CallbackQuery):
         elif action == "decrease" and products[product_key]["count"] > 0:
             products[product_key]["count"] -= 1
 
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=generate_product_menu())
+
+# ---- Очистка корзины ----
+@dp.callback_query(lambda c: c.data == "clear_cart")
+async def clear_cart(callback: types.CallbackQuery):
+    for key in products:
+        products[key]["count"] = 0
+    await callback.answer("Корзина очищена!")
     await callback.message.edit_reply_markup(reply_markup=generate_product_menu())
 
 # ---- Подтверждение заказа ----
@@ -141,13 +152,6 @@ async def get_address(message: types.Message, state: FSMContext):
 
     await message.answer(order_summary, parse_mode="Markdown", reply_markup=main_menu)
     await state.clear()
-
-# ---- Обработчик кнопки "📞 Связаться" ----
-@dp.callback_query(lambda c: c.data == "contact")
-async def contact_handler(callback: types.CallbackQuery):
-    await callback.message.answer(
-        "📞 Свяжитесь с нами:\n📍 Адрес: Kavala, Greece\n📱 Телефон: +30 251 039 1646\n💬 Telegram: @momento_support"
-    )
 
 # ---- Запуск бота ----
 async def main():
