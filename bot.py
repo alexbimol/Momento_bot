@@ -27,9 +27,28 @@ products = {
     "milkshake": {"name": "Milkshake", "price": 4.00, "count": 0},
     "hell": {"name": "Hell Energy", "price": 3.00, "count": 0},
     "monster": {"name": "Monster", "price": 3.50, "count": 0},
-    "pizza": {"name": "Pizza", "price": 5.00, "count": 0},
+    "juice": {"name": "Χυμός", "price": 3.00, "count": 0},
+    "soda": {"name": "Αναψυκτικά", "price": 2.50, "count": 0},
+    "tea": {"name": "Τσάι", "price": 3.00, "count": 0},
+    "ice_tea": {"name": "Ice Tea", "price": 2.50, "count": 0},
+    "simple_chocolate": {"name": "Σοκολάτα απλή", "price": 3.00, "count": 0},
+    "flavored_chocolate": {"name": "Σοκολάτα γεύση", "price": 3.50, "count": 0},
+    "viennese_chocolate": {"name": "Σοκολάτα βιενουά", "price": 3.50, "count": 0},
+    "drosspresso": {"name": "Drosspresso", "price": 3.50, "count": 0},
+    "triple_freddo": {"name": "Τριπλό freddo", "price": 3.50, "count": 0},
+    "greek_coffee": {"name": "Ελληνικός (μονός / διπλός)", "price": 2.00, "count": 0},
+    "espresso": {"name": "Espresso (μονό / διπλό)", "price": 2.00, "count": 0},
+    "beer": {"name": "Μπύρες (Fischer, Sol, Corona, Breezer, Kaiser)", "price": 4.00, "count": 0},
+    "wine_glass": {"name": "Κρασί ποτήρι", "price": 4.00, "count": 0},
+    "special_wine": {"name": "Κρασί ποικιλία", "price": 5.00, "count": 0},
+    "bianco_nero": {"name": "Bianco Nero", "price": 5.00, "count": 0},
+    "vodka_gin_whiskey": {"name": "Vodka / Gin / Ουίσκι", "price": 6.00, "count": 0},
+    "dark_rum": {"name": "Μαύρα ρούμια", "price": 7.00, "count": 0},
+    "special_drinks": {"name": "Special (Chivas, Dimple, Jack Daniels, Black Label, Cardhu)", "price": 8.00, "count": 0},
+    "pizza": {"name": "Πίτσα", "price": 5.00, "count": 0},
     "sandwich": {"name": "Club Sandwich", "price": 5.00, "count": 0},
-    "toast": {"name": "Toast", "price": 2.50, "count": 0}
+    "toast": {"name": "Τοστ", "price": 2.50, "count": 0},
+    "coffee_syrup": {"name": "Σιρόπι σε καφέ", "price": 0.50, "count": 0}
 }
 
 def generate_product_menu():
@@ -52,19 +71,6 @@ main_menu = InlineKeyboardMarkup(inline_keyboard=[
      InlineKeyboardButton(text="📜 Меню", callback_data="menu")],
     [InlineKeyboardButton(text="📞 Связаться", callback_data="contact")]
 ])
-
-# ---- Кнопки для отправки контакта и адреса ----
-contact_request = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="📱 Отправить телефон", request_contact=True)]],
-    resize_keyboard=True,
-    one_time_keyboard=True
-)
-
-address_request = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="📍 Отправить адрес", request_location=True)]],
-    resize_keyboard=True,
-    one_time_keyboard=True
-)
 
 # ---- Команда /start ----
 @dp.message(Command("start"))
@@ -118,43 +124,6 @@ async def confirm_order(callback: types.CallbackQuery, state: FSMContext):
     order_text += f"\n💰 **Итого:** {total_price}€\n\nВведите ваше имя:"
     await callback.message.answer(order_text, parse_mode="Markdown")
     await state.set_state(OrderState.name)
-
-# ---- Получение имени ----
-@dp.message(OrderState.name)
-async def get_name(message: types.Message, state: FSMContext):
-    await state.update_data(name=message.text)
-    await message.answer("📱 Введите ваш номер телефона или отправьте его кнопкой ниже:", reply_markup=contact_request)
-    await state.set_state(OrderState.phone)
-
-# ---- Получение телефона ----
-@dp.message(OrderState.phone)
-async def get_phone(message: types.Message, state: FSMContext):
-    phone = message.text if message.text else message.contact.phone_number
-    await state.update_data(phone=phone)
-    await message.answer("📍 Введите ваш адрес или отправьте геолокацию кнопкой ниже:", reply_markup=address_request)
-    await state.set_state(OrderState.address)
-
-# ---- Получение адреса и подтверждение ----
-@dp.message(OrderState.address)
-async def get_address(message: types.Message, state: FSMContext):
-    address = message.text if message.text else f"📍 Локация: {message.location.latitude}, {message.location.longitude}"
-    await state.update_data(address=address)
-    data = await state.get_data()
-
-    order_summary = (f"📝 **Новый заказ:**\n\n"
-                     f"👤 Имя: {data['name']}\n"
-                     f"📞 Телефон: {data['phone']}\n"
-                     f"📍 Адрес: {data['address']}\n\n"
-                     f"🛍 **Детали заказа:**\n")
-
-    for product in products.values():
-        if product["count"] > 0:
-            order_summary += f"• {product['name']} x {product['count']} = {product['count'] * product['price']}€\n"
-
-    order_summary += "\n📞 Свяжитесь с клиентом для подтверждения!"
-
-    await message.answer(order_summary, parse_mode="Markdown", reply_markup=main_menu)
-    await state.clear()
 
 # ---- Запуск бота ----
 async def main():
