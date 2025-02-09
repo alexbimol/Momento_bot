@@ -13,7 +13,7 @@ load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
 bot = Bot(token="7776292962:AAHM5hxD-jHPHrAxdI5SumSD4EQpWOlmIC8")
-dp = Dispatcher(bot)  # Указываем bot явно для избежания багов
+dp = Dispatcher()  # Создаём диспетчер без аргументов
 
 # ---- Состояния для оформления заказа ----
 class OrderState(StatesGroup):
@@ -152,6 +152,13 @@ async def get_address(message: types.Message, state: FSMContext):
 
     await message.answer(order_summary, parse_mode="Markdown", reply_markup=main_menu)
     await state.clear()
+
+# ---- Обработчик кнопки "📞 Связаться" ----
+@dp.callback_query(lambda c: c.data == "contact")
+async def contact_handler(callback: types.CallbackQuery):
+    await callback.message.answer(
+        "📞 Свяжитесь с нами:\n📍 Адрес: Kavala, Greece\n📱 Телефон: +30 251 039 1646\n💬 Telegram: @momento_support"
+    )
 
 # ---- Запуск бота ----
 async def main():
