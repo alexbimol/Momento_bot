@@ -2,20 +2,49 @@ import logging
 import asyncio
 import os
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 from dotenv import load_dotenv
 
 # Загружаем токен
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
-bot = Bot(token="7776292962:AAHM5hxD-jHPHrAxdI5SumSD4EQpWOlmIC8")  # Используем переменную из окружения
+bot = Bot(token="7776292962:AAHM5hxD-jHPHrAxdI5SumSD4EQpWOlmIC8")
 dp = Dispatcher()
 
-# Удаляем Webhook перед запуском, чтобы избежать конфликта
-async def delete_webhook():
-    await bot.delete_webhook(drop_pending_updates=True)
+# ---- Состояния для оформления заказа ----
+class OrderState(StatesGroup):
+    name = State()
+    phone = State()
+    address = State()
+    confirm = State()
+
+# ---- Меню с продуктами ----
+products = {
+    "milkshake": {"name": "Milkshake", "price": 4.00, "count": 0},
+    "hell": {"name": "Hell Energy", "price": 3.00, "count": 0},
+    "monster": {"name": "Monster", "price": 3.50, "count": 0},
+    "pizza": {"name": "Pizza", "price": 5.00, "count": 0},
+    "sandwich": {"name": "Club Sandwich", "price": 5.00, "count": 0},
+    "toast": {"name": "Toast", "price": 2.50, "count": 0}
+}
+
+def generate_product_menu():
+    """Создаёт кнопки с продуктами и кнопками + / -"""
+    buttons = []
+    for key, product in products.items():
+        buttons.append([
+            InlineKeyboardButton(text="➖", callback_data=f"decrease_{key}"),
+            InlineKeyboardButton(text=f"{product['name']} ({product['count']})", callback_data="none"),
+            InlineKeyboardButton(text="➕", callback_data=f"increase_{key}")
+        ])
+    buttons.append([InlineKeyboardButton(text="✅ Оформить заказ", callback_data="confirm_order")])
+    buttons.append([InlineKeyboardButton(text="🗑 Очистить корзину", callback_data="clear_cart")])
+    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 # ---- Главное меню ----
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
@@ -24,57 +53,18 @@ main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="📞 Связаться", callback_data="contact")]
 ])
 
-# ---- Кнопки категорий меню ----
-menu_categories = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="🥤 Χυμοί & Ροφήματα", callback_data="menu_juices")],
-    [InlineKeyboardButton(text="🍫 Σοκολάτες", callback_data="menu_chocolates")],
-    [InlineKeyboardButton(text="🍺 Μπύρες & Ποτά", callback_data="menu_drinks")],
-    [InlineKeyboardButton(text="🍕 Φαγητό", callback_data="menu_food")],
-    [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
-])
+# ---- Кнопки для отправки контакта и адреса ----
+contact_request = ReplyKeyboardMarkup(
+    keyboard=[[KeyboardButton(text="📱 Отправить телефон", request_contact=True)]],
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
 
-# ---- Полное меню ----
-menu_items = {
-    "menu_juices": (
-        "🥤 **Χυμοί & Ροφήματα**\n\n"
-        "• Milkshake (Βανίλια / Σοκολάτα / Φράουλα) – 4.00€\n"
-        "• Hell – 3.00€\n"
-        "• Monster – 3.50€\n"
-        "• Χυμός – 3.00€\n"
-        "• Αναψυκτικά – 2.50€\n"
-        "• Τσάι – 3.00€\n"
-        "• Ice Tea – 2.50€"
-    ),
-    "menu_chocolates": (
-        "🍫 **Σοκολάτες**\n\n"
-        "• Σοκολάτα απλή – 3.00€\n"
-        "• Σοκολάτα γεύση – 3.50€\n"
-        "• Σοκολάτα βιενουά – 3.50€\n"
-        "• Drosspresso – 3.50€\n"
-        "• Τριπλό freddo – 3.50€\n"
-        "• Ελληνικός (μονός / διπλός) – 2.00€ / 2.50€\n"
-        "• Espresso (μονό / διπλό) – 2.00€ / 2.50€"
-    ),
-    "menu_drinks": (
-        "🍺 **Μπύρες & Ποτά**\n\n"
-        "• Μπύρες (Fischer, Sol, Corona, Breezer, Kaiser) – 4.00€\n"
-        "• Heineken, Μάμος, Löwenbräu – 3.50€\n"
-        "• Κρασί ποτήρι – 4.00€\n"
-        "• Κρασί ποικιλία – 5.00€\n"
-        "• Bianco Nero – 5.00€\n"
-        "• Vodka / Gin / Ουίσκι – 6.00€\n"
-        "• Μαύρα ρούμια – 7.00€\n"
-        "• Special (Chivas, Dimple, Jack Daniels, Black Label, Cardhu) – 8.00€"
-    ),
-    "menu_food": (
-        "🍕 **Φαγητό**\n\n"
-        "• Πίτσα – 5.00€\n"
-        "• Club Sandwich – 5.00€\n"
-        "• Τοστ – 2.50€\n\n"
-        "**Extras**\n"
-        "• Σιρόπι σε καφέ (+0.50€)"
-    )
-}
+address_request = ReplyKeyboardMarkup(
+    keyboard=[[KeyboardButton(text="📍 Отправить адрес", request_location=True)]],
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
 
 # ---- Команда /start ----
 @dp.message(Command("start"))
@@ -85,43 +75,90 @@ async def send_welcome(message: types.Message):
         reply_markup=main_menu
     )
 
-# ---- Обработчик кнопки "📜 Меню" ----
-@dp.callback_query(lambda c: c.data == "menu")
-async def show_menu(callback: types.CallbackQuery):
-    await callback.answer()  # Закрывает "виснущую" кнопку
-    await callback.message.edit_text("Выберите категорию меню:", reply_markup=menu_categories)
+# ---- Обработчик кнопки "🛍 Заказать" ----
+@dp.callback_query(lambda c: c.data == "order")
+async def order_handler(callback: types.CallbackQuery):
+    await callback.answer()
+    await callback.message.edit_text("Выберите продукты:", reply_markup=generate_product_menu())
 
-# ---- Обработчик выбора категорий меню ----
-@dp.callback_query(lambda c: c.data in menu_items.keys())
-async def show_menu_category(callback: types.CallbackQuery):
-    category = callback.data
-    await callback.answer()  # Закрывает "виснущую" кнопку
-    await callback.message.edit_text(menu_items[category], parse_mode="Markdown", reply_markup=menu_categories)
+# ---- Увеличение и уменьшение количества ----
+@dp.callback_query(lambda c: c.data.startswith("increase_") or c.data.startswith("decrease_"))
+async def modify_product_count(callback: types.CallbackQuery):
+    action, product_key = callback.data.split("_")
+    if product_key in products:
+        if action == "increase":
+            products[product_key]["count"] += 1
+        elif action == "decrease" and products[product_key]["count"] > 0:
+            products[product_key]["count"] -= 1
 
-# ---- Обработчик кнопки "📞 Связаться" ----
-@dp.callback_query(lambda c: c.data == "contact")
-async def contact_handler(callback: types.CallbackQuery):
-    await callback.answer()  # Закрывает "виснущую" кнопку
-    await callback.message.answer(
-        "📞 Свяжитесь с нами:\n"
-        "📍 Адрес: Kavala, Greece\n"
-        "📱 Телефон: +30 251 039 1646\n"
-        "💬 Telegram: @momento_support"
-    )
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=generate_product_menu())
 
-# ---- Обработчик кнопки "Назад" ----
-@dp.callback_query(lambda c: c.data == "back_to_main")
-async def back_to_main(callback: types.CallbackQuery):
-    await callback.answer()  # Закрывает "виснущую" кнопку
-    await callback.message.edit_text(
-        "Вы можете оформить заказ, посмотреть меню или связаться с нами.",
-        reply_markup=main_menu
-    )
+# ---- Очистка корзины ----
+@dp.callback_query(lambda c: c.data == "clear_cart")
+async def clear_cart(callback: types.CallbackQuery):
+    for key in products:
+        products[key]["count"] = 0
+    await callback.answer("Корзина очищена!")
+    await callback.message.edit_reply_markup(reply_markup=generate_product_menu())
+
+# ---- Подтверждение заказа ----
+@dp.callback_query(lambda c: c.data == "confirm_order")
+async def confirm_order(callback: types.CallbackQuery, state: FSMContext):
+    total_price = sum(p["count"] * p["price"] for p in products.values())
+    if total_price == 0:
+        await callback.answer("Выберите хотя бы один продукт!", show_alert=True)
+        return
+
+    order_text = "🛒 **Ваш заказ:**\n\n"
+    for product in products.values():
+        if product["count"] > 0:
+            order_text += f"• {product['name']} x {product['count']} = {product['count'] * product['price']}€\n"
+
+    order_text += f"\n💰 **Итого:** {total_price}€\n\nВведите ваше имя:"
+    await callback.message.answer(order_text, parse_mode="Markdown")
+    await state.set_state(OrderState.name)
+
+# ---- Получение имени ----
+@dp.message(OrderState.name)
+async def get_name(message: types.Message, state: FSMContext):
+    await state.update_data(name=message.text)
+    await message.answer("📱 Введите ваш номер телефона или отправьте его кнопкой ниже:", reply_markup=contact_request)
+    await state.set_state(OrderState.phone)
+
+# ---- Получение телефона ----
+@dp.message(OrderState.phone)
+async def get_phone(message: types.Message, state: FSMContext):
+    phone = message.text if message.text else message.contact.phone_number
+    await state.update_data(phone=phone)
+    await message.answer("📍 Введите ваш адрес или отправьте геолокацию кнопкой ниже:", reply_markup=address_request)
+    await state.set_state(OrderState.address)
+
+# ---- Получение адреса и подтверждение ----
+@dp.message(OrderState.address)
+async def get_address(message: types.Message, state: FSMContext):
+    address = message.text if message.text else f"📍 Локация: {message.location.latitude}, {message.location.longitude}"
+    await state.update_data(address=address)
+    data = await state.get_data()
+
+    order_summary = (f"📝 **Новый заказ:**\n\n"
+                     f"👤 Имя: {data['name']}\n"
+                     f"📞 Телефон: {data['phone']}\n"
+                     f"📍 Адрес: {data['address']}\n\n"
+                     f"🛍 **Детали заказа:**\n")
+
+    for product in products.values():
+        if product["count"] > 0:
+            order_summary += f"• {product['name']} x {product['count']} = {product['count'] * product['price']}€\n"
+
+    order_summary += "\n📞 Свяжитесь с клиентом для подтверждения!"
+
+    await message.answer(order_summary, parse_mode="Markdown", reply_markup=main_menu)
+    await state.clear()
 
 # ---- Запуск бота ----
 async def main():
     logging.basicConfig(level=logging.INFO)
-    await delete_webhook()  # Очищаем Webhook перед запуском
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
