@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
-bot = Bot(token="7776292962:AAHQiJNdilk6D6_nNP07E-PfN8gDmm8rD8I")
+bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # Главное меню
@@ -20,12 +20,10 @@ main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="📜 Меню", callback_data="menu")]
 ])
 
-# Кнопки категорий меню
-menu_categories = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="☕ Χυμοί & Ροφήματα", callback_data="menu_juices")],
-    [InlineKeyboardButton(text="🍫 Σοκολάτες", callback_data="menu_chocolates")],
-    [InlineKeyboardButton(text="🍺 Μπύρες & Ποτά", callback_data="menu_drinks")],
-    [InlineKeyboardButton(text="🍕 Φαγητό", callback_data="menu_food")],
+# Меню заказа
+order_menu = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="☕ Кофе", callback_data="order_coffee"),
+     InlineKeyboardButton(text="🍹 Коктейли", callback_data="order_cocktails")],
     [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
 ])
 
@@ -38,12 +36,34 @@ async def send_welcome(message: types.Message):
         reply_markup=main_menu
     )
 
+# Обработчик кнопки "🛍 Заказать"
+@dp.callback_query(lambda c: c.data == "order")
+async def order_handler(callback: types.CallbackQuery):
+    await callback.message.edit_text(
+        "Что вы хотите заказать?",
+        reply_markup=order_menu
+    )
+
+# Обработчик выбора напитков
+@dp.callback_query(lambda c: c.data in ["order_coffee", "order_cocktails"])
+async def choose_drink(callback: types.CallbackQuery):
+    drink_type = "кофе" if callback.data == "order_coffee" else "коктейли"
+    await callback.message.answer(
+        f"Вы выбрали {drink_type}. Оформить заказ можно по телефону: +30 251 039 1646"
+    )
+
 # Обработчик кнопки "📜 Меню"
 @dp.callback_query(lambda c: c.data == "menu")
 async def show_menu(callback: types.CallbackQuery):
     await callback.message.edit_text(
         "Выберите категорию меню:",
-        reply_markup=menu_categories
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="☕ Χυμοί & Ροφήματα", callback_data="menu_juices")],
+            [InlineKeyboardButton(text="🍫 Σοκολάτες", callback_data="menu_chocolates")],
+            [InlineKeyboardButton(text="🍺 Μπύρες & Ποτά", callback_data="menu_drinks")],
+            [InlineKeyboardButton(text="🍕 Φαγητό", callback_data="menu_food")],
+            [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
+        ])
     )
 
 # Меню по категориям
@@ -90,7 +110,6 @@ async def send_menu_category(callback: types.CallbackQuery):
     category = callback.data
     await callback.message.edit_text(
         menu_text[category],
-        reply_markup=menu_categories,
         parse_mode="Markdown"
     )
 
