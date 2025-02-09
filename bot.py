@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
-bot = Bot(token="7776292962:AAHM5hxD-jHPHrAxdI5SumSD4EQpWOlmIC8")
+bot = Bot(token="7776292962:AAHM5hxD-jHPHrAxdI5SumSD4EQpWOlmIC8")  # Используем переменную из окружения
 dp = Dispatcher()
 
 # Удаляем Webhook перед запуском, чтобы избежать конфликта
@@ -88,17 +88,20 @@ async def send_welcome(message: types.Message):
 # ---- Обработчик кнопки "📜 Меню" ----
 @dp.callback_query(lambda c: c.data == "menu")
 async def show_menu(callback: types.CallbackQuery):
+    await callback.answer()  # Закрывает "виснущую" кнопку
     await callback.message.edit_text("Выберите категорию меню:", reply_markup=menu_categories)
 
 # ---- Обработчик выбора категорий меню ----
 @dp.callback_query(lambda c: c.data in menu_items.keys())
 async def show_menu_category(callback: types.CallbackQuery):
     category = callback.data
+    await callback.answer()  # Закрывает "виснущую" кнопку
     await callback.message.edit_text(menu_items[category], parse_mode="Markdown", reply_markup=menu_categories)
 
 # ---- Обработчик кнопки "📞 Связаться" ----
 @dp.callback_query(lambda c: c.data == "contact")
 async def contact_handler(callback: types.CallbackQuery):
+    await callback.answer()  # Закрывает "виснущую" кнопку
     await callback.message.answer(
         "📞 Свяжитесь с нами:\n"
         "📍 Адрес: Kavala, Greece\n"
@@ -109,6 +112,7 @@ async def contact_handler(callback: types.CallbackQuery):
 # ---- Обработчик кнопки "Назад" ----
 @dp.callback_query(lambda c: c.data == "back_to_main")
 async def back_to_main(callback: types.CallbackQuery):
+    await callback.answer()  # Закрывает "виснущую" кнопку
     await callback.message.edit_text(
         "Вы можете оформить заказ, посмотреть меню или связаться с нами.",
         reply_markup=main_menu
