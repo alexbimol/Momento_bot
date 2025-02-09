@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
-bot = Bot(token=TOKEN)
+bot = Bot(token="7776292962:AAHM5hxD-jHPHrAxdI5SumSD4EQpWOlmIC8")
 dp = Dispatcher()
 
 # Удаляем Webhook перед запуском, чтобы избежать конфликта
