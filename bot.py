@@ -15,6 +15,9 @@ TOKEN = os.getenv("BOT_TOKEN")
 bot = Bot(token="7776292962:AAHj3yUt0Kpw54AFOP998u3VJd-E1w8KFKA")
 dp = Dispatcher()
 
+# ---- Логирование ----
+logging.basicConfig(level=logging.INFO)
+
 # ---- Удаляем Webhook перед Polling ----
 async def delete_webhook():
     await bot.delete_webhook(drop_pending_updates=True)
@@ -24,6 +27,34 @@ class OrderState(StatesGroup):
     name = State()
     phone = State()
     address = State()
+    confirm = State()
+
+# ---- Полное меню с продуктами ----
+products = {
+    "milkshake": {"name": "Milkshake", "price": 4.00, "count": 0},
+    "hell": {"name": "Hell Energy", "price": 3.00, "count": 0},
+    "monster": {"name": "Monster", "price": 3.50, "count": 0},
+    "juice": {"name": "Χυμός", "price": 3.00, "count": 0},
+    "soft_drink": {"name": "Αναψυκτικά", "price": 2.50, "count": 0},
+    "tea": {"name": "Τσάι", "price": 3.00, "count": 0},
+    "pizza": {"name": "Πίτσα", "price": 5.00, "count": 0},
+    "sandwich": {"name": "Club Sandwich", "price": 5.00, "count": 0},
+    "toast": {"name": "Τοστ", "price": 2.50, "count": 0}
+}
+
+# ---- Функция генерации меню ----
+def generate_product_menu():
+    buttons = []
+    for key, product in products.items():
+        buttons.append([
+            InlineKeyboardButton(text="➖", callback_data=f"decrease_{key}"),
+            InlineKeyboardButton(text=f"{product['name']} ({product['count']})", callback_data="none"),
+            InlineKeyboardButton(text="➕", callback_data=f"increase_{key}")
+        ])
+    buttons.append([InlineKeyboardButton(text="✅ Оформить заказ", callback_data="confirm_order")])
+    buttons.append([InlineKeyboardButton(text="🗑 Очистить корзину", callback_data="clear_cart")])
+    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 # ---- Главное меню ----
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
@@ -31,58 +62,6 @@ main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="📜 Меню", callback_data="menu")],
     [InlineKeyboardButton(text="📞 Связаться", callback_data="contact")]
 ])
-
-# ---- Кнопки категорий меню ----
-menu_categories = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="🥤 Χυμοί & Ροφήματα", callback_data="menu_juices")],
-    [InlineKeyboardButton(text="🍫 Σοκολάτες", callback_data="menu_chocolates")],
-    [InlineKeyboardButton(text="🍺 Μπύρες & Ποτά", callback_data="menu_drinks")],
-    [InlineKeyboardButton(text="🍕 Φαγητό", callback_data="menu_food")],
-    [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
-])
-
-# ---- Полное меню ----
-menu_items = {
-    "menu_juices": (
-        "🥤 **Χυμοί & Ροφήματα**\n\n"
-        "• Milkshake (Βανίλια / Σοκολάτα / Φράουλα) – 4.00€\n"
-        "• Hell – 3.00€\n"
-        "• Monster – 3.50€\n"
-        "• Χυμός – 3.00€\n"
-        "• Αναψυκτικά – 2.50€\n"
-        "• Τσάι – 3.00€\n"
-        "• Ice Tea – 2.50€"
-    ),
-    "menu_chocolates": (
-        "🍫 **Σοκολάτες**\n\n"
-        "• Σοκολάτα απλή – 3.00€\n"
-        "• Σοκολάτα γεύση – 3.50€\n"
-        "• Σοκολάτα βιενουά – 3.50€\n"
-        "• Drosspresso – 3.50€\n"
-        "• Τριπλό freddo – 3.50€\n"
-        "• Ελληνικός (μονός / διπλός) – 2.00€ / 2.50€\n"
-        "• Espresso (μονό / διπλό) – 2.00€ / 2.50€"
-    ),
-    "menu_drinks": (
-        "🍺 **Μπύρες & Ποτά**\n\n"
-        "• Μπύρες (Fischer, Sol, Corona, Breezer, Kaiser) – 4.00€\n"
-        "• Heineken, Μάμος, Löwenbräu – 3.50€\n"
-        "• Κρασί ποτήρι – 4.00€\n"
-        "• Κρασί ποικιλία – 5.00€\n"
-        "• Bianco Nero – 5.00€\n"
-        "• Vodka / Gin / Ουίσκι – 6.00€\n"
-        "• Μαύρα ρούμια – 7.00€\n"
-        "• Special (Chivas, Dimple, Jack Daniels, Black Label, Cardhu) – 8.00€"
-    ),
-    "menu_food": (
-        "🍕 **Φαγητό**\n\n"
-        "• Πίτσα – 5.00€\n"
-        "• Club Sandwich – 5.00€\n"
-        "• Τοστ – 2.50€\n\n"
-        "**Extras**\n"
-        "• Σιρόπι σε καφέ (+0.50€)"
-    )
-}
 
 # ---- Кнопки для отправки телефона и локации ----
 contact_request = ReplyKeyboardMarkup(
@@ -97,7 +76,7 @@ location_request = ReplyKeyboardMarkup(
     one_time_keyboard=True
 )
 
-# ---- Обработчик команды /start ----
+# ---- Команда /start ----
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message):
     await message.answer(
@@ -106,21 +85,48 @@ async def send_welcome(message: types.Message):
         reply_markup=main_menu
     )
 
-# ---- Обработчик кнопки "📜 Меню" ----
-@dp.callback_query(lambda c: c.data == "menu")
-async def show_menu(callback: types.CallbackQuery):
-    await callback.message.edit_text("Выберите категорию меню:", reply_markup=menu_categories)
-
-# ---- Обработчик выбора категорий меню ----
-@dp.callback_query(lambda c: c.data in menu_items.keys())
-async def show_menu_category(callback: types.CallbackQuery):
-    category = callback.data
-    await callback.message.edit_text(menu_items[category], parse_mode="Markdown", reply_markup=menu_categories)
-
 # ---- Обработчик кнопки "🛍 Заказать" ----
 @dp.callback_query(lambda c: c.data == "order")
-async def order_handler(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer("Введите ваше имя:")
+async def order_handler(callback: types.CallbackQuery):
+    await callback.answer()
+    await callback.message.edit_text("Выберите продукты:", reply_markup=generate_product_menu())
+
+# ---- Увеличение и уменьшение количества ----
+@dp.callback_query(lambda c: c.data.startswith("increase_") or c.data.startswith("decrease_"))
+async def modify_product_count(callback: types.CallbackQuery):
+    action, product_key = callback.data.split("_")
+    if product_key in products:
+        if action == "increase":
+            products[product_key]["count"] += 1
+        elif action == "decrease" and products[product_key]["count"] > 0:
+            products[product_key]["count"] -= 1
+
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=generate_product_menu())
+
+# ---- Очистка корзины ----
+@dp.callback_query(lambda c: c.data == "clear_cart")
+async def clear_cart(callback: types.CallbackQuery):
+    for key in products:
+        products[key]["count"] = 0
+    await callback.answer("Корзина очищена!")
+    await callback.message.edit_reply_markup(reply_markup=generate_product_menu())
+
+# ---- Подтверждение заказа ----
+@dp.callback_query(lambda c: c.data == "confirm_order")
+async def confirm_order(callback: types.CallbackQuery, state: FSMContext):
+    total_price = sum(p["count"] * p["price"] for p in products.values())
+    if total_price == 0:
+        await callback.answer("Выберите хотя бы один продукт!", show_alert=True)
+        return
+
+    order_text = "🛒 **Ваш заказ:**\n\n"
+    for product in products.values():
+        if product["count"] > 0:
+            order_text += f"• {product['name']} x {product['count']} = {product['count'] * product['price']}€\n"
+
+    order_text += f"\n💰 **Итого:** {total_price}€\n\nВведите ваше имя:"
+    await callback.message.answer(order_text, parse_mode="Markdown")
     await state.set_state(OrderState.name)
 
 # ---- Получение имени ----
@@ -141,22 +147,30 @@ async def get_phone(message: types.Message, state: FSMContext):
 # ---- Получение адреса ----
 @dp.message(OrderState.address)
 async def get_address(message: types.Message, state: FSMContext):
-    address = message.text if message.text else f"📍 Локация: {message.location.latitude}, {message.location.longitude}"
-    await state.update_data(address=address)
-    data = await state.get_data()
+    try:
+        if message.location:
+            address = f"📍 Локация: {message.location.latitude}, {message.location.longitude}"
+        else:
+            address = message.text if message.text else "Адрес не указан"
 
-    order_summary = (f"📝 **Новый заказ:**\n\n"
-                     f"👤 Имя: {data['name']}\n"
-                     f"📞 Телефон: {data['phone']}\n"
-                     f"📍 Адрес: {data['address']}\n\n"
-                     "📞 Свяжитесь с клиентом для подтверждения!")
+        await state.update_data(address=address)
+        data = await state.get_data()
 
-    await message.answer(order_summary, parse_mode="Markdown", reply_markup=main_menu)
-    await state.clear()
+        order_summary = (f"📝 **Новый заказ:**\n\n"
+                        f"👤 Имя: {data['name']}\n"
+                        f"📞 Телефон: {data['phone']}\n"
+                        f"📍 Адрес: {data['address']}\n\n"
+                        "📞 Свяжитесь с клиентом для подтверждения!")
+
+        await message.answer(order_summary, parse_mode="Markdown", reply_markup=main_menu)
+        await state.clear()
+
+    except Exception as e:
+        logging.error(f"Ошибка при получении адреса: {e}")
+        await message.answer("⚠ Произошла ошибка! Попробуйте снова отправить адрес.")
 
 # ---- Запуск бота ----
 async def main():
-    logging.basicConfig(level=logging.INFO)
     await delete_webhook()
     await dp.start_polling(bot)
 
