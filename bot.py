@@ -24,7 +24,6 @@ class OrderState(StatesGroup):
     name = State()
     phone = State()
     address = State()
-    confirm = State()
 
 # ---- Главное меню ----
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
@@ -85,6 +84,19 @@ menu_items = {
     )
 }
 
+# ---- Кнопки для отправки телефона и локации ----
+contact_request = ReplyKeyboardMarkup(
+    keyboard=[[KeyboardButton(text="📱 Отправить телефон", request_contact=True)]],
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+
+location_request = ReplyKeyboardMarkup(
+    keyboard=[[KeyboardButton(text="📍 Отправить местоположение", request_location=True)]],
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+
 # ---- Обработчик команды /start ----
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message):
@@ -115,20 +127,22 @@ async def order_handler(callback: types.CallbackQuery, state: FSMContext):
 @dp.message(OrderState.name)
 async def get_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
-    await message.answer("📱 Введите ваш номер телефона:")
+    await message.answer("📱 Введите ваш номер телефона или отправьте его кнопкой ниже:", reply_markup=contact_request)
     await state.set_state(OrderState.phone)
 
 # ---- Получение телефона ----
 @dp.message(OrderState.phone)
 async def get_phone(message: types.Message, state: FSMContext):
-    await state.update_data(phone=message.text)
-    await message.answer("📍 Введите ваш адрес доставки:")
+    phone = message.text if message.text else message.contact.phone_number
+    await state.update_data(phone=phone)
+    await message.answer("📍 Введите ваш адрес или отправьте местоположение кнопкой ниже:", reply_markup=location_request)
     await state.set_state(OrderState.address)
 
 # ---- Получение адреса ----
 @dp.message(OrderState.address)
 async def get_address(message: types.Message, state: FSMContext):
-    await state.update_data(address=message.text)
+    address = message.text if message.text else f"📍 Локация: {message.location.latitude}, {message.location.longitude}"
+    await state.update_data(address=address)
     data = await state.get_data()
 
     order_summary = (f"📝 **Новый заказ:**\n\n"
@@ -140,28 +154,10 @@ async def get_address(message: types.Message, state: FSMContext):
     await message.answer(order_summary, parse_mode="Markdown", reply_markup=main_menu)
     await state.clear()
 
-# ---- Обработчик кнопки "📞 Связаться" ----
-@dp.callback_query(lambda c: c.data == "contact")
-async def contact_handler(callback: types.CallbackQuery):
-    await callback.message.answer(
-        "📞 Свяжитесь с нами:\n"
-        "📍 Адрес: Kavala, Greece\n"
-        "📱 Телефон: +30 251 039 1646\n"
-        "💬 Telegram: @momento_support"
-    )
-
-# ---- Обработчик кнопки "Назад" ----
-@dp.callback_query(lambda c: c.data == "back_to_main")
-async def back_to_main(callback: types.CallbackQuery):
-    await callback.message.edit_text(
-        "Вы можете оформить заказ, посмотреть меню или связаться с нами.",
-        reply_markup=main_menu
-    )
-
 # ---- Запуск бота ----
 async def main():
     logging.basicConfig(level=logging.INFO)
-    await delete_webhook()  # Удаляем Webhook перед запуском Polling
+    await delete_webhook()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
