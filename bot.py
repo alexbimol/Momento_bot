@@ -8,11 +8,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from dotenv import load_dotenv
 
-# Загружаем токен
+# Загружаем токен из .env
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
-bot = Bot(token="7776292962:AAHj3yUt0Kpw54AFOP998u3VJd-E1w8KFKA")
+bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # ---- Состояния для заказа ----
@@ -20,7 +20,6 @@ class OrderState(StatesGroup):
     name = State()
     phone = State()
     address = State()
-    confirm = State()
 
 # ---- Главное меню ----
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
@@ -29,7 +28,7 @@ main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="📞 Επικοινωνία", callback_data="contact")]
 ])
 
-# ---- Кнопка отправки телефона и адреса ----
+# ---- Кнопки для запроса контакта и локации ----
 contact_request = ReplyKeyboardMarkup(
     keyboard=[[KeyboardButton(text="📱 Στείλτε το τηλέφωνό σας", request_contact=True)]],
     resize_keyboard=True,
@@ -42,7 +41,7 @@ address_request = ReplyKeyboardMarkup(
     one_time_keyboard=True
 )
 
-# ---- Полное меню (на греческом) ----
+# ---- Полное меню ----
 menu_text = (
     "📜 **Πλήρες Μενού Momento Cafe Bar**\n\n"
     "🥤 **Χυμοί & Ροφήματα**\n"
@@ -82,12 +81,11 @@ menu_text = (
     "• Σιρόπι σε καφέ (+0.50€)\n"
 )
 
-# ---- Обработчик кнопки "📜 Μενού" ----
+# ---- Обработчики кнопок ----
 @dp.callback_query(lambda c: c.data == "menu")
 async def show_menu(callback: types.CallbackQuery):
     await callback.message.edit_text(menu_text, parse_mode="Markdown", reply_markup=main_menu)
 
-# ---- Обработчик кнопки "📞 Επικοινωνία" ----
 @dp.callback_query(lambda c: c.data == "contact")
 async def contact_handler(callback: types.CallbackQuery):
     contact_text = (
@@ -101,8 +99,14 @@ async def contact_handler(callback: types.CallbackQuery):
 # ---- Обработчик кнопки "🛍 Παραγγελία" ----
 @dp.callback_query(lambda c: c.data == "order")
 async def order_handler(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer("📌 Πληκτρολογήστε το όνομά σας:")
-    await state.set_state(OrderState.name)
+    data = await state.get_data()
+    
+    if "name" in data:
+        await callback.message.answer("📱 Στείλτε το τηλέφωνό σας πατώντας το κουμπί παρακάτω:", reply_markup=contact_request)
+        await state.set_state(OrderState.phone)
+    else:
+        await callback.message.answer("📌 Πληκτρολογήστε το όνομά σας:")
+        await state.set_state(OrderState.name)
 
 # ---- Получение имени ----
 @dp.message(OrderState.name)
@@ -137,17 +141,10 @@ async def get_address(message: types.Message, state: FSMContext):
     await message.answer(order_summary, parse_mode="Markdown", reply_markup=main_menu)
     await state.clear()
 
-# ---- Обработчик кнопки "Επιστροφή" ----
-@dp.callback_query(lambda c: c.data == "back_to_main")
-async def back_to_main(callback: types.CallbackQuery):
-    await callback.message.edit_text(
-        "Μπορείτε να κάνετε μια παραγγελία, να δείτε το μενού ή να επικοινωνήσετε μαζί μας.",
-        reply_markup=main_menu
-    )
-
 # ---- Команда /start ----
 @dp.message(Command("start"))
-async def send_welcome(message: types.Message):
+async def send_welcome(message: types.Message, state: FSMContext):
+    await state.clear()
     await message.answer(
         "Καλώς ήρθατε στο **Momento Cafe Bar**! ☕️🍹\n\n"
         "Μπορείτε να κάνετε παραγγελία, να δείτε το μενού ή να επικοινωνήσετε μαζί μας.",
