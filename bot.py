@@ -17,9 +17,36 @@ dp = Dispatcher()
 
 # ---- Состояния для заказа ----
 class OrderState(StatesGroup):
-    name = State()
+    choosing_category = State()
+    choosing_product = State()
+    confirming_order = State()
     phone = State()
     address = State()
+
+# ---- Меню товаров ----
+menu_items = {
+    "🥤 Ροφήματα": [
+        ("Milkshake", 4.00),
+        ("Hell", 3.00),
+        ("Monster", 3.50),
+        ("Χυμός", 3.00),
+    ],
+    "🍫 Καφές & Σοκολάτες": [
+        ("Σοκολάτα απλή", 3.00),
+        ("Espresso", 2.50),
+        ("Freddo Cappuccino", 3.50),
+    ],
+    "🍺 Ποτά": [
+        ("Heineken", 3.50),
+        ("Corona", 4.00),
+        ("Vodka", 6.00),
+    ],
+    "🍕 Φαγητό": [
+        ("Πίτσα", 5.00),
+        ("Club Sandwich", 5.00),
+        ("Τοστ", 2.50),
+    ]
+}
 
 # ---- Главное меню ----
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
@@ -28,91 +55,72 @@ main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="📞 Επικοινωνία", callback_data="contact")]
 ])
 
-# ---- Кнопки для запроса контакта и локации ----
-contact_request = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="📱 Στείλτε το τηλέφωνό σας", request_contact=True)]],
-    resize_keyboard=True,
-    one_time_keyboard=True
+# ---- Выбор категории ----
+category_menu = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [InlineKeyboardButton(text=cat, callback_data=f"category_{cat}")] for cat in menu_items.keys()
+    ] + [[InlineKeyboardButton(text="✅ Επιβεβαίωση Παραγγελίας", callback_data="confirm_order")]]
 )
-
-address_request = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="📍 Στείλτε την τοποθεσία σας", request_location=True)]],
-    resize_keyboard=True,
-    one_time_keyboard=True
-)
-
-# ---- Полное меню ----
-menu_text = (
-    "📜 **Πλήρες Μενού Momento Cafe Bar**\n\n"
-    "🥤 **Χυμοί & Ροφήματα**\n"
-    "• Milkshake (Βανίλια, Σοκολάτα, Φράουλα) – 4.00€\n"
-    "• Hell – 3.00€\n"
-    "• Monster – 3.50€\n"
-    "• Χυμός – 3.00€\n"
-    "• Αναψυκτικά – 2.50€\n"
-    "• Τσάι – 3.00€\n"
-    "• Ice Tea – 2.50€\n\n"
-    
-    "🍫 **Σοκολάτες & Καφές**\n"
-    "• Σοκολάτα απλή – 3.00€\n"
-    "• Σοκολάτα γεύση – 3.50€\n"
-    "• Σοκολάτα βιενουά – 3.50€\n"
-    "• Drosspresso – 3.50€\n"
-    "• Τριπλό freddo – 3.50€\n"
-    "• Ελληνικός (μονός / διπλός) – 2.00€ / 2.50€\n"
-    "• Espresso (μονό / διπλό) – 2.00€ / 2.50€\n\n"
-
-    "🍺 **Μπύρες & Ποτά**\n"
-    "• Μπύρες (Fischer, Sol, Corona, Breezer, Kaiser) – 4.00€\n"
-    "• Heineken, Μάμος, Löwenbräu – 3.50€\n"
-    "• Κρασί ποτήρι – 4.00€\n"
-    "• Κρασί ποικιλία – 5.00€\n"
-    "• Bianco Nero – 5.00€\n"
-    "• Vodka / Gin / Ουίσκι – 6.00€\n"
-    "• Μαύρα ρούμια – 7.00€\n"
-    "• Special (Chivas, Dimple, Jack Daniels, Black Label, Cardhu) – 8.00€\n\n"
-
-    "🍕 **Φαγητό**\n"
-    "• Πίτσα – 5.00€\n"
-    "• Club Sandwich – 5.00€\n"
-    "• Τοστ – 2.50€\n\n"
-
-    "✨ **Extras**\n"
-    "• Σιρόπι σε καφέ (+0.50€)\n"
-)
-
-# ---- Обработчики кнопок ----
-@dp.callback_query(lambda c: c.data == "menu")
-async def show_menu(callback: types.CallbackQuery):
-    await callback.message.edit_text(menu_text, parse_mode="Markdown", reply_markup=main_menu)
-
-@dp.callback_query(lambda c: c.data == "contact")
-async def contact_handler(callback: types.CallbackQuery):
-    contact_text = (
-        "📞 **Επικοινωνία Momento Cafe Bar**\n\n"
-        "📍 **Διεύθυνση:** Kavala, Greece\n"
-        "📱 **Τηλέφωνο:** +30 251 039 1646\n"
-        "💬 **Telegram:** @momento_support"
-    )
-    await callback.message.edit_text(contact_text, parse_mode="Markdown", reply_markup=main_menu)
 
 # ---- Обработчик кнопки "🛍 Παραγγελία" ----
 @dp.callback_query(lambda c: c.data == "order")
 async def order_handler(callback: types.CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    
-    if "name" in data:
-        await callback.message.answer("📱 Στείλτε το τηλέφωνό σας πατώντας το κουμπί παρακάτω:", reply_markup=contact_request)
-        await state.set_state(OrderState.phone)
-    else:
-        await callback.message.answer("📌 Πληκτρολογήστε το όνομά σας:")
-        await state.set_state(OrderState.name)
+    await state.update_data(order={})  # Обнуляем заказ
+    await callback.message.answer("📌 Επιλέξτε κατηγορία:", reply_markup=category_menu)
+    await state.set_state(OrderState.choosing_category)
 
-# ---- Получение имени ----
-@dp.message(OrderState.name)
-async def get_name(message: types.Message, state: FSMContext):
-    await state.update_data(name=message.text)
-    await message.answer("📱 Στείλτε το τηλέφωνό σας πατώντας το κουμπί παρακάτω:", reply_markup=contact_request)
+# ---- Выбор категории ----
+@dp.callback_query(lambda c: c.data.startswith("category_"))
+async def choose_category(callback: types.CallbackQuery, state: FSMContext):
+    category = callback.data.replace("category_", "")
+    items = menu_items.get(category, [])
+    
+    # Формируем кнопки для выбора товаров
+    product_buttons = [
+        [
+            InlineKeyboardButton(text=f"{name} - {price:.2f}€", callback_data=f"product_{name}"),
+            InlineKeyboardButton(text="➕", callback_data=f"add_{name}")
+        ]
+        for name, price in items
+    ]
+
+    product_menu = InlineKeyboardMarkup(inline_keyboard=product_buttons + [[InlineKeyboardButton(text="⬅️ Πίσω", callback_data="back_to_categories")]])
+    await callback.message.edit_text(f"🛒 **{category}**\n\nΕπιλέξτε προϊόν:", parse_mode="Markdown", reply_markup=product_menu)
+
+# ---- Добавление товара ----
+@dp.callback_query(lambda c: c.data.startswith("add_"))
+async def add_product(callback: types.CallbackQuery, state: FSMContext):
+    product = callback.data.replace("add_", "")
+    data = await state.get_data()
+    order = data.get("order", {})
+
+    if product in order:
+        order[product] += 1
+    else:
+        order[product] = 1
+
+    await state.update_data(order=order)
+    await callback.answer(f"✅ Προστέθηκε {product} (Σύνολο: {order[product]})")
+
+# ---- Возврат к категориям ----
+@dp.callback_query(lambda c: c.data == "back_to_categories")
+async def back_to_categories(callback: types.CallbackQuery):
+    await callback.message.edit_text("📌 Επιλέξτε κατηγορία:", reply_markup=category_menu)
+
+# ---- Подтверждение заказа ----
+@dp.callback_query(lambda c: c.data == "confirm_order")
+async def confirm_order(callback: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    order = data.get("order", {})
+
+    if not order:
+        await callback.answer("🚫 Δεν έχετε προσθέσει προϊόντα!", show_alert=True)
+        return
+
+    order_text = "\n".join([f"• {item} x{count}" for item, count in order.items()])
+    total_price = sum(menu_items[cat][[i[0] for i in menu_items[cat]].index(item)][1] * count for cat in menu_items for item, count in order.items())
+
+    await callback.message.answer(f"🛒 **Η παραγγελία σας**:\n\n{order_text}\n\n💰 **Σύνολο: {total_price:.2f}€**\n\n📱 Στείλτε το τηλέφωνό σας:", reply_markup=contact_request)
     await state.set_state(OrderState.phone)
 
 # ---- Получение телефона ----
@@ -120,21 +128,22 @@ async def get_name(message: types.Message, state: FSMContext):
 async def get_phone(message: types.Message, state: FSMContext):
     phone = message.text if message.text else message.contact.phone_number
     await state.update_data(phone=phone)
-    await message.answer("📍 Στείλτε την τοποθεσία σας πατώντας το κουμπί παρακάτω:", reply_markup=address_request)
+    await message.answer("📍 Στείλτε την τοποθεσία σας:", reply_markup=address_request)
     await state.set_state(OrderState.address)
 
 # ---- Получение адреса ----
 @dp.message(OrderState.address)
 async def get_address(message: types.Message, state: FSMContext):
     address = message.text if message.text else f"📍 Τοποθεσία: {message.location.latitude}, {message.location.longitude}"
-    await state.update_data(address=address)
     data = await state.get_data()
 
     order_summary = (
         "📦 **Νέα Παραγγελία**\n\n"
-        f"👤 **Όνομα:** {data['name']}\n"
         f"📞 **Τηλέφωνο:** {data['phone']}\n"
-        f"📍 **Διεύθυνση:** {data['address']}\n\n"
+        f"📍 **Διεύθυνση:** {address}\n\n"
+        "🛒 **Παραγγελία:**\n"
+        + "\n".join([f"• {item} x{count}" for item, count in data["order"].items()])
+        + f"\n💰 **Σύνολο: {sum(menu_items[cat][[i[0] for i in menu_items[cat]].index(item)][1] * count for cat in menu_items for item, count in data['order'].items()):.2f}€**\n\n"
         "📌 **Επικοινωνήστε με τον πελάτη για επιβεβαίωση!**"
     )
 
@@ -143,13 +152,8 @@ async def get_address(message: types.Message, state: FSMContext):
 
 # ---- Команда /start ----
 @dp.message(Command("start"))
-async def send_welcome(message: types.Message, state: FSMContext):
-    await state.clear()
-    await message.answer(
-        "Καλώς ήρθατε στο **Momento Cafe Bar**! ☕️🍹\n\n"
-        "Μπορείτε να κάνετε παραγγελία, να δείτε το μενού ή να επικοινωνήσετε μαζί μας.",
-        reply_markup=main_menu
-    )
+async def send_welcome(message: types.Message):
+    await message.answer("Καλώς ήρθατε στο **Momento Cafe Bar**! ☕️🍹", reply_markup=main_menu)
 
 # ---- Запуск бота ----
 async def main():
