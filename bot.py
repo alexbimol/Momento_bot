@@ -4,15 +4,18 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import StatesGroup, State
 
 TOKEN = "7640783920:AAFktcYES5xv_-OLHR2CVwOq2jDL968SqxY"
 
 bot = Bot(token=TOKEN)
-dp = Dispatcher()
+storage = MemoryStorage()
+dp = Dispatcher(storage=storage)
 
 class OrderState(StatesGroup):
     choosing_category = State()
+    choosing_product = State()
     phone = State()
     address = State()
 
@@ -64,7 +67,8 @@ main_menu = InlineKeyboardMarkup(inline_keyboard=[
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message):
     await message.answer(
-        "👋 Καλώς ήρθατε στο **Momento Cafe Bar**! ☕️🍹",
+        "👋 Καλώς ήρθατε στο **Momento Cafe Bar**! ☕️🍹\n\n"
+        "Μπορείτε να κάνετε παραγγελία, να δείτε το μενού ή να επικοινωνήσετε μαζί μας.",
         reply_markup=main_menu
     )
 
@@ -74,7 +78,7 @@ async def show_menu(callback: types.CallbackQuery):
         f"🍽 **{cat}**\n" + "\n".join([f"• {name} – {price:.2f}€" for name, price in items])
         for cat, items in menu_items.items()
     ])
-    await callback.message.answer(f"📜 **Μενού**\n\n{menu_text}", parse_mode="Markdown", reply_markup=main_menu)
+    await callback.message.edit_text(f"📜 **Μενού**\n\n{menu_text}", parse_mode="Markdown", reply_markup=main_menu)
 
 @dp.callback_query(lambda c: c.data == "contact")
 async def contact_handler(callback: types.CallbackQuery):
@@ -84,17 +88,31 @@ async def contact_handler(callback: types.CallbackQuery):
         "📱 **Τηλέφωνο:** +30 251 039 1646\n"
         "💬 **Telegram:** @momento_support"
     )
-    await callback.message.answer(contact_text, parse_mode="Markdown", reply_markup=main_menu)
+    await callback.message.edit_text(contact_text, parse_mode="Markdown", reply_markup=main_menu)
 
 @dp.callback_query(lambda c: c.data == "order")
 async def order_handler(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(order={})
     category_menu = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=cat, callback_data=f"category_{cat}")] for cat in menu_items.keys()
+        [InlineKeyboardButton(text=cat, callback_data=f"category_{i}")] for i, cat in enumerate(menu_items.keys())
     ] + [[InlineKeyboardButton(text="✅ Επιβεβαίωση Παραγγελίας", callback_data="confirm_order")]])
 
-    await callback.message.answer("📌 Επιλέξτε κατηγορία:", reply_markup=category_menu)
+    await callback.message.edit_text("📌 Επιλέξτε κατηγορία:", reply_markup=category_menu)
     await state.set_state(OrderState.choosing_category)
+
+@dp.callback_query(lambda c: c.data.startswith("category_"))
+async def choose_category(callback: types.CallbackQuery, state: FSMContext):
+    category_index = int(callback.data.split("_")[1])
+    category_name = list(menu_items.keys())[category_index]
+    items = menu_items[category_name]
+
+    product_buttons = [
+        [InlineKeyboardButton(text=f"{name} - {price:.2f}€", callback_data=f"add_{name}")]
+        for name, price in items
+    ]
+
+    product_menu = InlineKeyboardMarkup(inline_keyboard=product_buttons + [[InlineKeyboardButton(text="⬅️ Πίσω", callback_data="order")]])
+    await callback.message.edit_text(f"🛒 **{category_name}**\n\nΕπιλέξτε προϊόν:", parse_mode="Markdown", reply_markup=product_menu)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
