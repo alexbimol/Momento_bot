@@ -10,10 +10,25 @@ from aiogram.fsm.state import StatesGroup, State
 
 TOKEN = "7640783920:AAFktcYES5xv_-OLHR2CVwOq2jDL968SqxY"
 
-bot = Bot(token=TOKEN)
+# Проверяем, работает ли токен
+async def check_token():
+    try:
+        bot = Bot(token=TOKEN)
+        user = await bot.get_me()
+        logging.info(f"Бот запущен: {user.username}")
+        return bot
+    except Exception as e:
+        logging.error(f"Ошибка с токеном: {e}")
+        return None
+
+bot = asyncio.run(check_token())
+if not bot:
+    exit("Ошибка: Проверь токен в BotFather!")
+
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
+# Классы состояний для FSM
 class OrderState(StatesGroup):
     choosing_category = State()
     choosing_product = State()
@@ -22,6 +37,7 @@ class OrderState(StatesGroup):
     address = State()
     confirmation = State()
 
+# Полное меню Momento Cafe Bar
 menu_items = {
     "🥤 Χυμοί & Ροφήματα": [
         ("Milkshake (Βανίλια / Σοκολάτα / Φράουλα)", 4.00),
@@ -63,10 +79,11 @@ menu_items = {
     ]
 }
 
+# Главное меню
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="🛍 Παραγγελία", callback_data="order")],
     [InlineKeyboardButton(text="📜 Μενού", callback_data="menu")],
-    [InlineKeyboardButton(text="📞 Επικοινωνία", url="tel:+302510391646")]  # Добавили кнопку с телефоном
+    [InlineKeyboardButton(text="📞 Επικοινωνία", url="tel:+302510391646")]  # Кнопка с телефоном
 ])
 
 @dp.message(Command("start"))
@@ -119,24 +136,6 @@ async def add_product(callback: types.CallbackQuery, state: FSMContext):
 
     await state.update_data(order=order)
     await callback.answer(f"✅ {product_name} προστέθηκε στην παραγγελία!", show_alert=False)
-
-@dp.callback_query(lambda c: c.data == "confirm_order")
-async def confirm_order(callback: types.CallbackQuery, state: FSMContext):
-    user_data = await state.get_data()
-    order = user_data.get("order", {})
-
-    if not order:
-        await callback.answer("❌ Η παραγγελία σας είναι άδεια!", show_alert=True)
-        return
-
-    order_text = "\n".join([f"• {product} x{count}" for product, count in order.items()])
-    
-    await callback.message.edit_text(
-        f"📝 **Η παραγγελία σας:**\n\n{order_text}\n\n"
-        "📌 Παρακαλώ στείλτε το όνομά σας:",
-        parse_mode="Markdown"
-    )
-    await state.set_state(OrderState.name)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
