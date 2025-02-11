@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import StatesGroup, State
 
-TOKEN = "7640783920:AAFktcYES5xv_-OLHR2CVwOq2jDL968SqxY"
+TOKEN = "7640783920:AAFktcYES5xv_OLHR2CVwOq2jDL968SqxY"
 
 bot = Bot(token=TOKEN)
 storage = MemoryStorage()
@@ -66,7 +66,7 @@ menu_items = {
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="🛍 Παραγγελία", callback_data="order")],
     [InlineKeyboardButton(text="📜 Μενού", callback_data="menu")],
-    [InlineKeyboardButton(text="📞 Επικοινωνία", callback_data="contact")]
+    [InlineKeyboardButton(text="📞 Επικοινωνία", url="tel:+302510391646")]  # Добавили кнопку с телефоном
 ])
 
 @dp.message(Command("start"))
@@ -138,30 +138,9 @@ async def confirm_order(callback: types.CallbackQuery, state: FSMContext):
     )
     await state.set_state(OrderState.name)
 
-@dp.message(OrderState.name)
-async def get_name(message: types.Message, state: FSMContext):
-    await state.update_data(name=message.text)
+async def main():
+    logging.basicConfig(level=logging.INFO)
+    await dp.start_polling(bot)
 
-    phone_keyboard = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📞 Отправить телефон", request_contact=True)]],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
-
-    await message.answer("📞 Παρακαλώ στείλτε το τηλέφωνό σας:", reply_markup=phone_keyboard)
-    await state.set_state(OrderState.phone)
-
-@dp.message(OrderState.phone)
-async def get_phone(message: types.Message, state: FSMContext):
-    if message.contact:
-        phone_number = message.contact.phone_number
-    else:
-        phone_number = message.text.strip()
-
-    await state.update_data(phone=phone_number)
-    await message.answer("📍 Παρακαλώ στείλτε τη διεύθυνσή σας:", reply_markup=ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📍 Отправить местоположение", request_location=True)]],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    ))
-    await state.set_state(OrderState.address)
+if __name__ == "__main__":
+    asyncio.run(main())
