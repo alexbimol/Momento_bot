@@ -14,9 +14,9 @@ TOKEN = "7640783920:AAFktcYES5xv_-OLHR2CVwOq2jDL968SqxY"
 logging.basicConfig(level=logging.INFO)
 
 # Инициализация бота и диспетчера
-bot = Bot(token=TOKEN)
+bot = Bot(token=TOKEN, parse_mode="HTML")  # Добавил parse_mode
 storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
+dp = Dispatcher()
 
 # Проверяем токен перед запуском
 async def check_token():
@@ -87,8 +87,9 @@ main_menu = InlineKeyboardMarkup(inline_keyboard=[
 
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message):
+    logging.info(f"📩 Команда /start от {message.from_user.id}")
     await message.answer(
-        "👋 Καλώς ήρθατε στο **Momento Cafe Bar**! ☕️🍹\n\n"
+        "👋 Καλώς ήρθατε στο <b>Momento Cafe Bar</b>! ☕️🍹\n\n"
         "Μπορείτε να κάνετε παραγγελία, να δείτε το μενού ή να επικοινωνήσετε μαζί μας.",
         reply_markup=main_menu
     )
@@ -96,10 +97,10 @@ async def send_welcome(message: types.Message):
 @dp.callback_query(lambda c: c.data == "menu")
 async def show_menu(callback: types.CallbackQuery):
     menu_text = "\n\n".join([
-        f"🍽 **{cat}**\n" + "\n".join([f"• {name} – {price:.2f}€" for name, price in items])
+        f"🍽 <b>{cat}</b>\n" + "\n".join([f"• {name} – {price:.2f}€" for name, price in items])
         for cat, items in menu_items.items()
     ])
-    await callback.message.edit_text(f"📜 **Μενού**\n\n{menu_text}", parse_mode="Markdown", reply_markup=main_menu)
+    await callback.message.edit_text(f"📜 <b>Μενού</b>\n\n{menu_text}", parse_mode="HTML", reply_markup=main_menu)
 
 @dp.callback_query(lambda c: c.data == "order")
 async def order_handler(callback: types.CallbackQuery, state: FSMContext):
@@ -123,7 +124,7 @@ async def choose_category(callback: types.CallbackQuery, state: FSMContext):
     ]
 
     product_menu = InlineKeyboardMarkup(inline_keyboard=product_buttons + [[InlineKeyboardButton(text="⬅️ Πίσω", callback_data="order")]])
-    await callback.message.edit_text(f"🛒 **{category_name}**\n\nΕπιλέξτε προϊόν:", parse_mode="Markdown", reply_markup=product_menu)
+    await callback.message.edit_text(f"🛒 <b>{category_name}</b>\n\nΕπιλέξτε προϊόν:", parse_mode="HTML", reply_markup=product_menu)
 
 @dp.callback_query(lambda c: c.data.startswith("add_"))
 async def add_product(callback: types.CallbackQuery, state: FSMContext):
@@ -138,7 +139,13 @@ async def add_product(callback: types.CallbackQuery, state: FSMContext):
 
 async def main():
     await check_token()  # Проверяем токен перед запуском
+    dp.include_router(dp)  # Обязательно добавляем роутер!
+    logging.info("🔹 Запуск polling...")
+    print("🔹 Бот запущен. Ожидаю сообщения...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logging.info("❌ Бот остановлен вручную.")
