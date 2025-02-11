@@ -1,7 +1,8 @@
 import logging
 import asyncio
+import re
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -16,9 +17,9 @@ dp = Dispatcher(storage=storage)
 class OrderState(StatesGroup):
     choosing_category = State()
     choosing_product = State()
+    name = State()
     phone = State()
     address = State()
-    name = State()
     confirmation = State()
 
 menu_items = {
@@ -31,15 +32,35 @@ menu_items = {
         ("Τσάι", 3.00),
         ("Ice Tea", 2.50),
     ],
-    "🍫 Σοκολάτες & Καφές": [
+    "🍫 Σοκολάτες": [
         ("Σοκολάτα απλή", 3.00),
         ("Σοκολάτα γεύση", 3.50),
         ("Σοκολάτα βιενουά", 3.50),
         ("Drosspresso", 3.50),
         ("Τριπλό freddo", 3.50),
-        ("Ελληνικός (μονός / διπλός)", 2.00),
-        ("Espresso (μονό / διπλό)", 2.00),
+        ("Ελληνικός (μονός)", 2.00),
+        ("Ελληνικός (διπλός)", 2.50),
+        ("Espresso (μονό)", 2.00),
+        ("Espresso (διπλό)", 2.50),
     ],
+    "🍺 Μπύρες & Ποτά": [
+        ("Μπύρες (Fischer, Sol, Corona, Breezer, Kaiser)", 4.00),
+        ("Heineken, Μάμος, Löwenbräu", 3.50),
+        ("Κρασί ποτήρι", 4.00),
+        ("Κρασί ποικιλία", 5.00),
+        ("Bianco Nero", 5.00),
+        ("Vodka / Gin / Ουίσκι", 6.00),
+        ("Μαύρα ρούμια", 7.00),
+        ("Special (Chivas, Dimple, Jack Daniels, Black Label, Cardhu)", 8.00),
+    ],
+    "🍕 Φαγητό": [
+        ("Πίτσα", 5.00),
+        ("Club Sandwich", 5.00),
+        ("Τοστ", 2.50),
+    ],
+    "✨ Extras": [
+        ("Σιρόπι σε καφέ", 0.50),
+    ]
 }
 
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
@@ -121,48 +142,26 @@ async def confirm_order(callback: types.CallbackQuery, state: FSMContext):
 async def get_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
 
-    await message.answer(
-        "📞 Παρακαλώ στείλτε το τηλέφωνό σας:",
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text="📞 Αποστολή τηλεφώνου", request_contact=True)]],
-            resize_keyboard=True,
-            one_time_keyboard=True
-        )
+    phone_keyboard = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="📞 Отправить телефон", request_contact=True)]],
+        resize_keyboard=True,
+        one_time_keyboard=True
     )
+
+    await message.answer("📞 Παρακαλώ στείλτε το τηλέφωνό σας:", reply_markup=phone_keyboard)
     await state.set_state(OrderState.phone)
 
 @dp.message(OrderState.phone)
 async def get_phone(message: types.Message, state: FSMContext):
-    if not message.contact:
-        await message.answer("❌ Στείλτε το τηλέφωνό σας μέσω του κουμπιού!")
-        return
+    if message.contact:
+        phone_number = message.contact.phone_number
+    else:
+        phone_number = message.text.strip()
 
-    await state.update_data(phone=message.contact.phone_number)
-
-    await message.answer("📍 Παρακαλώ στείλτε τη διεύθυνσή σας:")
+    await state.update_data(phone=phone_number)
+    await message.answer("📍 Παρακαλώ στείλτε τη διεύθυνσή σας:", reply_markup=ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="📍 Отправить местоположение", request_location=True)]],
+        resize_keyboard=True,
+        one_time_keyboard=True
+    ))
     await state.set_state(OrderState.address)
-
-@dp.message(OrderState.address)
-async def get_address(message: types.Message, state: FSMContext):
-    await state.update_data(address=message.text)
-    user_data = await state.get_data()
-
-    order_text = "\n".join([f"• {product} x{count}" for product, count in user_data['order'].items()])
-    
-    await message.answer(
-        f"✅ **Η παραγγελία ολοκληρώθηκε!**\n\n"
-        f"👤 Όνομα: {user_data['name']}\n"
-        f"📞 Τηλέφωνο: {user_data['phone']}\n"
-        f"📍 Διεύθυνση: {user_data['address']}\n\n"
-        f"📝 **Παραγγελία:**\n{order_text}\n\n"
-        "📌 Σύντομα θα επικοινωνήσουμε μαζί σας!",
-        reply_markup=main_menu
-    )
-    await state.clear()
-
-async def main():
-    logging.basicConfig(level=logging.INFO)
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
