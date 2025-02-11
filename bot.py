@@ -10,23 +10,22 @@ from aiogram.fsm.state import StatesGroup, State
 
 TOKEN = "7640783920:AAFktcYES5xv_-OLHR2CVwOq2jDL968SqxY"
 
-# Проверяем, работает ли токен
-async def check_token():
-    try:
-        bot = Bot(token=TOKEN)
-        user = await bot.get_me()
-        logging.info(f"Бот запущен: {user.username}")
-        return bot
-    except Exception as e:
-        logging.error(f"Ошибка с токеном: {e}")
-        return None
+# Настраиваем логирование
+logging.basicConfig(level=logging.INFO)
 
-bot = asyncio.run(check_token())
-if not bot:
-    exit("Ошибка: Проверь токен в BotFather!")
-
+# Инициализация бота и диспетчера
+bot = Bot(token=TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
+
+# Проверяем токен перед запуском
+async def check_token():
+    try:
+        user = await bot.get_me()
+        logging.info(f"✅ Бот запущен: @{user.username}")
+    except Exception as e:
+        logging.error(f"❌ Ошибка с токеном: {e}")
+        exit("Ошибка: Проверь токен в BotFather!")
 
 # Классы состояний для FSM
 class OrderState(StatesGroup):
@@ -138,7 +137,7 @@ async def add_product(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer(f"✅ {product_name} προστέθηκε στην παραγγελία!", show_alert=False)
 
 async def main():
-    logging.basicConfig(level=logging.INFO)
+    await check_token()  # Проверяем токен перед запуском
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
