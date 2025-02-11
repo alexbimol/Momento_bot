@@ -114,6 +114,39 @@ async def choose_category(callback: types.CallbackQuery, state: FSMContext):
     product_menu = InlineKeyboardMarkup(inline_keyboard=product_buttons + [[InlineKeyboardButton(text="⬅️ Πίσω", callback_data="order")]])
     await callback.message.edit_text(f"🛒 **{category_name}**\n\nΕπιλέξτε προϊόν:", parse_mode="Markdown", reply_markup=product_menu)
 
+@dp.callback_query(lambda c: c.data.startswith("add_"))
+async def add_product(callback: types.CallbackQuery, state: FSMContext):
+    product_name = callback.data[4:]
+    user_data = await state.get_data()
+
+    order = user_data.get("order", {})
+    order[product_name] = order.get(product_name, 0) + 1
+
+    await state.update_data(order=order)
+    await callback.answer(f"✅ {product_name} προστέθηκε στην παραγγελία!", show_alert=False)
+
+@dp.callback_query(lambda c: c.data == "confirm_order")
+async def confirm_order(callback: types.CallbackQuery, state: FSMContext):
+    user_data = await state.get_data()
+    order = user_data.get("order", {})
+
+    if not order:
+        await callback.answer("❌ Η παραγγελία σας είναι άδεια!", show_alert=True)
+        return
+
+    order_text = "\n".join([f"• {product} x{count}" for product, count in order.items()])
+    
+    await callback.message.edit_text(
+        f"📝 **Η παραγγελία σας:**\n\n{order_text}\n\n"
+        "📌 Παρακαλώ στείλτε το τηλέφωνό σας:",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📞 Αποστολή τηλεφώνου", request_contact=True)],
+            [InlineKeyboardButton(text="⬅️ Πίσω", callback_data="order")]
+        ])
+    )
+    await state.set_state(OrderState.phone)
+
 async def main():
     logging.basicConfig(level=logging.INFO)
     await dp.start_polling(bot)
