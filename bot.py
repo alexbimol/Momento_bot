@@ -11,7 +11,7 @@ from aiogram.fsm.state import StatesGroup, State
 
 # Загружаем токен из .env
 load_dotenv()
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.getenv("7640783920:AAFktcYES5xv_-OLHR2CVwOq2jDL968SqxY")
 
 if not TOKEN:
     raise ValueError("❌ Ошибка: Токен бота не найден! Проверь переменные окружения.")
