@@ -11,7 +11,7 @@ from aiogram.fsm.state import StatesGroup, State
 
 # Загружаем токен из .env
 load_dotenv()
-TOKEN = os.getenv("7640783920:AAFktcYES5xv_-OLHR2CVwOq2jDL968SqxY")
+TOKEN = os.getenv("BOT_TOKEN")  # Должен быть в переменных Railway
 
 if not TOKEN:
     raise ValueError("❌ Ошибка: Токен бота не найден! Проверь переменные окружения.")
@@ -20,10 +20,9 @@ if not TOKEN:
 logging.basicConfig(level=logging.INFO)
 
 # Инициализация бота и диспетчера
-  # Убрал parse_mode из bot = Bot(token=TOKEN, parse_mode="HTML")
-
+bot = Bot(token=TOKEN)
 storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
+dp = Dispatcher()
 
 # Проверяем токен перед запуском
 async def check_token():
@@ -56,12 +55,13 @@ async def send_welcome(message: types.Message):
     await message.answer(
         "👋 Καλώς ήρθατε στο <b>Momento Cafe Bar</b>! ☕️🍹\n\n"
         "Μπορείτε να κάνετε παραγγελία, να δείτε το μενού ή να επικοινωνήσετε μαζί μας.",
+        parse_mode="HTML",
         reply_markup=main_menu
     )
 
 async def main():
     await check_token()
-    dp.include_router(dp)
+    dp.include_router(dp)  # Добавляем роутер
     logging.info("🔹 Запуск polling...")
     print("🔹 Бот запущен. Ожидаю сообщения...")
     await dp.start_polling(bot)
