@@ -15,26 +15,17 @@ TOKEN = os.getenv("BOT_TOKEN")
 
 # Проверка токена
 if not TOKEN:
-    raise ValueError("❌ Токен бота не найден! Проверь .env файл!")
+    raise ValueError("❌ Ошибка: Токен бота не найден! Проверь переменные окружения.")
 
-# Настраиваем логирование
+# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
-# Инициализация бота и диспетчера
+# Создаем бота и диспетчер
 bot = Bot(token=TOKEN, parse_mode="HTML")
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
-# Проверка токена перед запуском
-async def check_token():
-    try:
-        user = await bot.get_me()
-        logging.info(f"✅ Бот запущен: @{user.username}")
-    except Exception as e:
-        logging.error(f"❌ Ошибка с токеном: {e}")
-        exit("Ошибка: Проверь токен в BotFather!")
-
-# Состояния для FSM (заказ)
+# Классы состояний FSM
 class OrderState(StatesGroup):
     choosing_category = State()
     choosing_product = State()
@@ -43,7 +34,7 @@ class OrderState(StatesGroup):
     address = State()
     confirmation = State()
 
-# Меню с товарами
+# Полное меню Momento Cafe Bar
 menu_items = {
     "🥤 Χυμοί & Ροφήματα": [
         ("Milkshake (Βανίλια / Σοκολάτα / Φράουλα)", 4.00),
@@ -58,26 +49,41 @@ menu_items = {
         ("Σοκολάτα απλή", 3.00),
         ("Σοκολάτα γεύση", 3.50),
         ("Σοκολάτα βιενουά", 3.50),
+        ("Drosspresso", 3.50),
+        ("Τριπλό freddo", 3.50),
+        ("Ελληνικός (μονός)", 2.00),
+        ("Ελληνικός (διπλός)", 2.50),
+        ("Espresso (μονό)", 2.00),
+        ("Espresso (διπλό)", 2.50),
     ],
     "🍺 Μπύρες & Ποτά": [
         ("Μπύρες (Fischer, Sol, Corona, Breezer, Kaiser)", 4.00),
         ("Heineken, Μάμος, Löwenbräu", 3.50),
+        ("Κρασί ποτήρι", 4.00),
+        ("Κρασί ποικιλία", 5.00),
+        ("Bianco Nero", 5.00),
         ("Vodka / Gin / Ουίσκι", 6.00),
+        ("Μαύρα ρούμια", 7.00),
+        ("Special (Chivas, Dimple, Jack Daniels, Black Label, Cardhu)", 8.00),
     ],
     "🍕 Φαγητό": [
         ("Πίτσα", 5.00),
         ("Club Sandwich", 5.00),
         ("Τοστ", 2.50),
     ],
+    "✨ Extras": [
+        ("Σιρόπι σε καφέ", 0.50),
+    ]
 }
 
 # Главное меню
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="🛍 Παραγγελία", callback_data="order")],
     [InlineKeyboardButton(text="📜 Μενού", callback_data="menu")],
-    [InlineKeyboardButton(text="📞 Επικοινωνία", url="tel:+302510391646")]
+    [InlineKeyboardButton(text="📞 Επικοινωνία", url="tel:+302510391646")]  # Кнопка с телефоном
 ])
 
+# Команда /start
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message):
     logging.info(f"📩 Команда /start от {message.from_user.id}")
@@ -87,6 +93,7 @@ async def send_welcome(message: types.Message):
         reply_markup=main_menu
     )
 
+# Обработчик меню
 @dp.callback_query(lambda c: c.data == "menu")
 async def show_menu(callback: types.CallbackQuery):
     menu_text = "\n\n".join([
@@ -95,6 +102,7 @@ async def show_menu(callback: types.CallbackQuery):
     ])
     await callback.message.edit_text(f"📜 <b>Μενού</b>\n\n{menu_text}", parse_mode="HTML", reply_markup=main_menu)
 
+# Обработчик заказа
 @dp.callback_query(lambda c: c.data == "order")
 async def order_handler(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(order={})
@@ -105,6 +113,7 @@ async def order_handler(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.edit_text("📌 Επιλέξτε κατηγορία:", reply_markup=category_menu)
     await state.set_state(OrderState.choosing_category)
 
+# Обработчик выбора категории
 @dp.callback_query(lambda c: c.data.startswith("category_"))
 async def choose_category(callback: types.CallbackQuery, state: FSMContext):
     category_index = int(callback.data.split("_")[1])
@@ -119,6 +128,7 @@ async def choose_category(callback: types.CallbackQuery, state: FSMContext):
     product_menu = InlineKeyboardMarkup(inline_keyboard=product_buttons + [[InlineKeyboardButton(text="⬅️ Πίσω", callback_data="order")]])
     await callback.message.edit_text(f"🛒 <b>{category_name}</b>\n\nΕπιλέξτε προϊόν:", parse_mode="HTML", reply_markup=product_menu)
 
+# Обработчик добавления продукта
 @dp.callback_query(lambda c: c.data.startswith("add_"))
 async def add_product(callback: types.CallbackQuery, state: FSMContext):
     product_name = callback.data[4:]
@@ -130,11 +140,12 @@ async def add_product(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(order=order)
     await callback.answer(f"✅ {product_name} προστέθηκε στην παραγγελία!", show_alert=False)
 
+# Функция запуска бота
 async def main():
-    await check_token()
-    logging.info("🔹 Запуск бота...")
+    logging.info("🔹 Бот запускается...")
     await dp.start_polling(bot)
 
+# Запуск бота
 if __name__ == "__main__":
     try:
         asyncio.run(main())
