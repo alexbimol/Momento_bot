@@ -20,7 +20,8 @@ if not TOKEN:
 logging.basicConfig(level=logging.INFO)
 
 # Инициализация бота и диспетчера
-bot = Bot(token=TOKEN, default=parse_mode="HTML")  # Убрал parse_mode из аргументов
+  # Убрал parse_mode из bot = Bot(token=TOKEN, parse_mode="HTML")
+
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
