@@ -1,24 +1,31 @@
 import logging
 import asyncio
-import re
+import os
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import StatesGroup, State
+from dotenv import load_dotenv
 
-TOKEN = "7640783920:AAFktcYES5xv_-OLHR2CVwOq2jDL968SqxY"
+# Загружаем переменные окружения
+load_dotenv()
+TOKEN = os.getenv("BOT_TOKEN")
+
+# Проверка токена
+if not TOKEN:
+    raise ValueError("❌ Токен бота не найден! Проверь .env файл!")
 
 # Настраиваем логирование
 logging.basicConfig(level=logging.INFO)
 
 # Инициализация бота и диспетчера
-bot = Bot(token=TOKEN, parse_mode="HTML")  # Добавил parse_mode
+bot = Bot(token=TOKEN, parse_mode="HTML")
 storage = MemoryStorage()
-dp = Dispatcher()
+dp = Dispatcher(storage=storage)
 
-# Проверяем токен перед запуском
+# Проверка токена перед запуском
 async def check_token():
     try:
         user = await bot.get_me()
@@ -27,7 +34,7 @@ async def check_token():
         logging.error(f"❌ Ошибка с токеном: {e}")
         exit("Ошибка: Проверь токен в BotFather!")
 
-# Классы состояний для FSM
+# Состояния для FSM (заказ)
 class OrderState(StatesGroup):
     choosing_category = State()
     choosing_product = State()
@@ -36,7 +43,7 @@ class OrderState(StatesGroup):
     address = State()
     confirmation = State()
 
-# Полное меню Momento Cafe Bar
+# Меню с товарами
 menu_items = {
     "🥤 Χυμοί & Ροφήματα": [
         ("Milkshake (Βανίλια / Σοκολάτα / Φράουλα)", 4.00),
@@ -51,38 +58,24 @@ menu_items = {
         ("Σοκολάτα απλή", 3.00),
         ("Σοκολάτα γεύση", 3.50),
         ("Σοκολάτα βιενουά", 3.50),
-        ("Drosspresso", 3.50),
-        ("Τριπλό freddo", 3.50),
-        ("Ελληνικός (μονός)", 2.00),
-        ("Ελληνικός (διπλός)", 2.50),
-        ("Espresso (μονό)", 2.00),
-        ("Espresso (διπλό)", 2.50),
     ],
     "🍺 Μπύρες & Ποτά": [
         ("Μπύρες (Fischer, Sol, Corona, Breezer, Kaiser)", 4.00),
         ("Heineken, Μάμος, Löwenbräu", 3.50),
-        ("Κρασί ποτήρι", 4.00),
-        ("Κρασί ποικιλία", 5.00),
-        ("Bianco Nero", 5.00),
         ("Vodka / Gin / Ουίσκι", 6.00),
-        ("Μαύρα ρούμια", 7.00),
-        ("Special (Chivas, Dimple, Jack Daniels, Black Label, Cardhu)", 8.00),
     ],
     "🍕 Φαγητό": [
         ("Πίτσα", 5.00),
         ("Club Sandwich", 5.00),
         ("Τοστ", 2.50),
     ],
-    "✨ Extras": [
-        ("Σιρόπι σε καφέ", 0.50),
-    ]
 }
 
 # Главное меню
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="🛍 Παραγγελία", callback_data="order")],
     [InlineKeyboardButton(text="📜 Μενού", callback_data="menu")],
-    [InlineKeyboardButton(text="📞 Επικοινωνία", url="tel:+302510391646")]  # Кнопка с телефоном
+    [InlineKeyboardButton(text="📞 Επικοινωνία", url="tel:+302510391646")]
 ])
 
 @dp.message(Command("start"))
@@ -138,10 +131,8 @@ async def add_product(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer(f"✅ {product_name} προστέθηκε στην παραγγελία!", show_alert=False)
 
 async def main():
-    await check_token()  # Проверяем токен перед запуском
-    dp.include_router(dp)  # Обязательно добавляем роутер!
-    logging.info("🔹 Запуск polling...")
-    print("🔹 Бот запущен. Ожидаю сообщения...")
+    await check_token()
+    logging.info("🔹 Запуск бота...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
