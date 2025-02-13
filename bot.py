@@ -1,7 +1,5 @@
 import logging
 import asyncio
-import os
-from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
@@ -9,12 +7,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import StatesGroup, State
 
-# Загрузка переменных окружения
-load_dotenv()
-TOKEN = os.getenv("BOT_TOKEN")  # Должен быть в переменных Railway
+# Указываем токен бота напрямую
+TOKEN = "7640783920:AAFktcYES5xv_-OLHR2CVwOq2jDL968SqxY"  # Замените на свой токен
 
 if not TOKEN:
-    raise ValueError("❌ Ошибка: Токен бота не найден! Проверь переменные окружения.")
+    raise ValueError("❌ Ошибка: Токен бота не найден!")
 
 # Настраиваем логирование
 logging.basicConfig(level=logging.INFO)
@@ -44,7 +41,7 @@ menu_items = {
     "Напитки 🥤": [("Сок апельсиновый", 3.00), ("Кока-Кола", 2.50)]
 }
 
-# Команда старт
+# Команда /start
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message):
     logging.info(f"📩 Команда /start от {message.from_user.id}")
